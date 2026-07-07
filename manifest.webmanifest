@@ -1,0 +1,14 @@
+{
+  "name": "Emet Daily Dashboard",
+  "short_name": "Emet Daily",
+  "description": "Eisenhower matrix task planner - plan your day by priority.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
