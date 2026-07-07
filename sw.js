@@ -1,11 +1,13 @@
 /* Offline cache so the app opens with no internet and installs as a PWA. */
-const CACHE = 'emet-daily-v7';
+const CACHE = 'emet-daily-v8';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './manifest.webmanifest',
-  './icon.svg'
+  './icon.svg',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', e => {
