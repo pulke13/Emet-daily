@@ -1,5 +1,5 @@
 /* Offline cache so the app opens with no internet and installs as a PWA. */
-const CACHE = 'emet-daily-v12';
+const CACHE = 'emet-daily-v13';
 const ASSETS = [
   './',
   './index.html',

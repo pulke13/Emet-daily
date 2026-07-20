@@ -172,6 +172,11 @@
   /* ---- Hebrew / right-to-left ---- */
   html[dir="rtl"] .field label{letter-spacing:normal;text-transform:none;}
   html[dir="rtl"] header h1{letter-spacing:normal;}
+  /* Times and dates are numeric: they must ALWAYS read left-to-right, or Hebrew
+     mirrors the segments and the hours land where minutes should be. */
+  input[type=time],input[type=date]{direction:ltr;}
+  html[dir="rtl"] input[type=time],html[dir="rtl"] input[type=date]{text-align:right;}
+  .badge[dir="ltr"]{direction:ltr;unicode-bidi:isolate;}
 </style>
 </head>
 <body>
@@ -221,7 +226,7 @@
     <div class="row">
       <div class="field">
         <label data-i18n="f_time">Reminder time</label>
-        <input type="time" id="fTime">
+        <input type="time" id="fTime" dir="ltr">
       </div>
       <div class="field">
         <label>&nbsp;</label>
@@ -231,7 +236,7 @@
     <div class="row">
       <div class="field">
         <label data-i18n="f_date">Reminder date (optional)</label>
-        <input type="date" id="fDate">
+        <input type="date" id="fDate" dir="ltr">
       </div>
       <div class="field">
         <label>&nbsp;</label>

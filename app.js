@@ -263,11 +263,11 @@ function taskHTML(x){
   const bg = x.color ? `style="background:${hexToSoft(x.color)};border-color:${x.color}55"` : '';
   let badges = '';
   if (x.date && x.date !== todayStr()){
-    badges += `<span class="badge">&#128197; ${esc(x.date)}</span>`;
+    badges += `<span class="badge" dir="ltr">&#128197; ${esc(x.date)}</span>`;
   }
   if (x.time){
     const soon = isForToday(x) && isDueSoon(x.time);
-    badges += `<span class="badge alarm ${soon?'due-soon':''}">&#128276; ${esc(x.time)}</span>`;
+    badges += `<span class="badge alarm ${soon?'due-soon':''}" dir="ltr">&#128276; ${esc(x.time)}</span>`;
   }
   if (x.repeat){
     const rl = x.repeat === 'daily' ? t('rep_daily') : t('rep_weekly');
