@@ -5,6 +5,9 @@
 
 const STORE_KEY = 'emet_daily_tasks_v1';
 const LANG_KEY  = 'emet_daily_lang';
+const APIKEY_KEY = 'emet_daily_api_key';
+const MODEL_KEY  = 'emet_daily_model';
+const DEFAULT_MODEL = 'gemini-3.5-flash';
 
 /* ---------- translations ---------- */
 const I18N = {
@@ -43,7 +46,23 @@ const I18N = {
     confirm_restore:'This will REPLACE your current tasks with the backup. Continue?',
     confirm_clear:'Delete ALL tasks? This cannot be undone.',
     confirm_del:'Delete this task?',
-    notif_title:'Emet Daily - Reminder', reminder_prefix:'Reminder: '
+    notif_title:'Emet Daily - Reminder', reminder_prefix:'Reminder: ',
+    settings_title:'Settings',
+    settings_desc:'The API key is stored only on this device and is used by AI Prioritize.',
+    f_apikey:'Gemini API key', ph_apikey:'Paste your Gemini API key...',
+    f_model:'AI model',
+    show_key:'Show', hide_key:'Hide',
+    save_settings:'Save Settings', toast_settings:'Settings saved',
+    ai_nokey:'Set your Gemini API key in Settings first',
+    ai_none:'No backlog tasks to prioritize',
+    ai_thinking:'AI is prioritizing...',
+    ai_done:'AI sorted {n} task(s) into the matrix',
+    ai_err:'AI request failed - check key & internet',
+    f_date:'Reminder date (optional)', clear_date:'Clear date',
+    hint_matrix:'Tap a task to edit it. Drag the ⋮⋮ handle to move it between priority boxes. Use 🧠 to let AI sort the backlog.',
+    hint_today:'Tasks with a reminder for today (or with no date) appear here, sorted by time.',
+    f_repeat:'Repeat', rep_none:'None', rep_daily:'Daily', rep_weekly:'Weekly',
+    stats_fmt:'Done today: {t}  ·  Total done: {n}  ·  Streak: {s}d'
   },
   he: {
     langLabel:'EN',
@@ -80,7 +99,23 @@ const I18N = {
     confirm_restore:'פעולה זו תחליף את המשימות הנוכחיות בגיבוי. להמשיך?',
     confirm_clear:'למחוק את כל המשימות? לא ניתן לבטל.',
     confirm_del:'למחוק את המשימה הזו?',
-    notif_title:'אמת יומי - תזכורת', reminder_prefix:'תזכורת: '
+    notif_title:'אמת יומי - תזכורת', reminder_prefix:'תזכורת: ',
+    settings_title:'הגדרות',
+    settings_desc:'מפתח ה-API נשמר רק במכשיר הזה ומשמש את תיעדוף ה-AI.',
+    f_apikey:'מפתח API של Gemini', ph_apikey:'הדבק כאן את מפתח ה-API...',
+    f_model:'מודל AI',
+    show_key:'הצג', hide_key:'הסתר',
+    save_settings:'שמור הגדרות', toast_settings:'ההגדרות נשמרו',
+    ai_nokey:'קודם הגדר את מפתח ה-API של Gemini בהגדרות',
+    ai_none:'אין משימות במאגר לתעדוף',
+    ai_thinking:'ה-AI מתעדף...',
+    ai_done:'ה-AI סידר {n} משימות במטריצה',
+    ai_err:'בקשת ה-AI נכשלה - בדוק מפתח וחיבור לאינטרנט',
+    f_date:'תאריך תזכורת (לא חובה)', clear_date:'נקה תאריך',
+    hint_matrix:'הקש על משימה לעריכה. גרור בידית ⋮⋮ להעברה בין תיבות עדיפות. לחץ 🧠 כדי שה-AI יסדר את המאגר.',
+    hint_today:'משימות עם תזכורת להיום (או ללא תאריך) מופיעות כאן, לפי שעה.',
+    f_repeat:'חזרה', rep_none:'ללא', rep_daily:'יומי', rep_weekly:'שבועי',
+    stats_fmt:'הושלמו היום: {t}  ·  סה"כ: {n}  ·  רצף: {s} ימים'
   }
 };
 
@@ -106,6 +141,14 @@ const QUAD_OPTIONS = [
   { value:'NotUrgent_NotImportant',tk:'opt_elim' },
 ];
 let quadValue = 'None';
+
+// Repeat options for the segmented control in the editor
+const REPEAT_OPTIONS = [
+  { value:'',       tk:'rep_none'   },
+  { value:'daily',  tk:'rep_daily'  },
+  { value:'weekly', tk:'rep_weekly' },
+];
+let repeatValue = '';
 
 let tasks = load();
 let editingId = null;
@@ -135,6 +178,7 @@ function applyLang(){
   });
   document.getElementById('btnLang').textContent = t('langLabel');
   buildQuadDropdown();   // re-label the custom dropdown in the new language
+  buildRepeat();         // re-label the repeat control too
   render();
 }
 function toggleLang(){
@@ -147,9 +191,37 @@ function toggleLang(){
 const app = document.getElementById('app');
 
 function render(){
+  const hint = document.getElementById('hint');
+  if (hint) hint.textContent = t(currentView === 'matrix' ? 'hint_matrix' : 'hint_today');
+  renderStats();
   if (currentView === 'matrix') renderMatrix();
   else renderToday();
 }
+
+/* ---------- progress stats (done today / total / streak) ---------- */
+function computeStats(){
+  const today = todayStr();
+  const done = tasks.filter(x => x.done);
+  const doneToday = done.filter(x => (x.doneAt||'') === today).length;
+  const days = new Set(done.map(x => x.doneAt).filter(Boolean));
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  let streak = 0, d = new Date();
+  if(!days.has(iso(d))) d.setDate(d.getDate()-1);   // today not done yet? count back from yesterday
+  while(days.has(iso(d))){ streak++; d.setDate(d.getDate()-1); }
+  return { today: doneToday, total: done.length, streak };
+}
+function renderStats(){
+  const el = document.getElementById('stats');
+  if(!el) return;
+  const s = computeStats();
+  el.textContent = t('stats_fmt').replace('{t}', s.today).replace('{n}', s.total).replace('{s}', s.streak);
+}
+
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function isForToday(x){ return !x.date || x.date === todayStr(); }
 
 function renderMatrix(){
   const groups = [BACKLOG, ...QUADS];
@@ -161,7 +233,7 @@ function renderMatrix(){
 }
 
 function renderToday(){
-  const withTime = tasks.filter(x => x.time).sort((a,b) => a.time.localeCompare(b.time));
+  const withTime = tasks.filter(x => x.time && isForToday(x)).sort((a,b) => a.time.localeCompare(b.time));
   const noTime   = tasks.filter(x => !x.time && !x.done);
   let html  = zoneHTML('__timed',  t('today_sched_title'), t('today_sched_sub'), '#007BFF', withTime, true);
       html += zoneHTML('__untimed',t('today_none_title'),  t('today_none_sub'),  '#8a8f9e', noTime,  true);
@@ -190,9 +262,16 @@ function zoneHTML(quadId, title, sub, color, list, noDrop){
 function taskHTML(x){
   const bg = x.color ? `style="background:${hexToSoft(x.color)};border-color:${x.color}55"` : '';
   let badges = '';
+  if (x.date && x.date !== todayStr()){
+    badges += `<span class="badge">&#128197; ${esc(x.date)}</span>`;
+  }
   if (x.time){
-    const soon = isDueSoon(x.time);
+    const soon = isForToday(x) && isDueSoon(x.time);
     badges += `<span class="badge alarm ${soon?'due-soon':''}">&#128276; ${esc(x.time)}</span>`;
+  }
+  if (x.repeat){
+    const rl = x.repeat === 'daily' ? t('rep_daily') : t('rep_weekly');
+    badges += `<span class="badge">&#128260; ${esc(rl)}</span>`;
   }
   if (x.details) badges += `<span class="badge">&#128221; ${esc(t('notes'))}</span>`;
   return `
@@ -221,6 +300,7 @@ function wireZones(){
 function toggleDone(id){
   const x = getTask(id); if(!x) return;
   x.done = !x.done;
+  x.doneAt = x.done ? todayStr() : '';   // timestamp powers the stats bar
   save(); render();
 }
 
@@ -242,6 +322,9 @@ function openEditor(id){
   document.getElementById('fQuad').classList.remove('open');
   buildQuadDropdown();
   document.getElementById('fTime').value    = x ? (x.time||'') : '';
+  document.getElementById('fDate').value    = x ? (x.date||'') : '';
+  repeatValue = x ? (x.repeat||'') : '';
+  buildRepeat();
   buildSwatches(x ? (x.color||'') : '');
   document.getElementById('doneTask').classList.toggle('hidden', !x);
   document.getElementById('delTask').classList.toggle('hidden', !x);
@@ -257,6 +340,8 @@ function saveFromEditor(){
     details:  document.getElementById('fDetails').value,
     quadrant: quadValue,
     time:     document.getElementById('fTime').value,
+    date:     document.getElementById('fDate').value,
+    repeat:   repeatValue,
     color:    selectedColor,
   };
   if(editingId){
@@ -317,6 +402,17 @@ function setQuad(v){
   quadValue = v;
   document.getElementById('fQuad').classList.remove('open');
   buildQuadDropdown();
+}
+
+/* ---------- repeat segmented control ---------- */
+function buildRepeat(){
+  const box = document.getElementById('fRepeat');
+  if(!box) return;
+  box.innerHTML = REPEAT_OPTIONS.map(o =>
+    `<div class="seg ${o.value===repeatValue?'sel':''}" data-rep="${o.value}">${esc(t(o.tk))}</div>`
+  ).join('');
+  box.querySelectorAll('[data-rep]').forEach(el =>
+    el.addEventListener('click', () => { repeatValue = el.dataset.rep; buildRepeat(); }));
 }
 
 /* ---------- touch drag between quadrants ---------- */
@@ -394,6 +490,7 @@ function scheduleAlarms(){
   const now = new Date();
   tasks.forEach(x => {
     if(x.done || !x.time) return;
+    if(x.date && x.date !== todayStr()) return;   // reminder is for another day
     const [h,m] = x.time.split(':').map(Number);
     const when = new Date();
     when.setHours(h, m, 0, 0);
@@ -407,6 +504,15 @@ function fireAlarm(x){
   try { new Notification(t('notif_title'), { body: x.text, icon:'icon.svg' }); } catch(e){}
   try { navigator.vibrate && navigator.vibrate([300,150,300]); } catch(e){}
   toast(t('reminder_prefix') + x.text);
+  // Repeating task: roll its reminder forward to the next occurrence so it re-arms
+  if(x.repeat === 'daily' || x.repeat === 'weekly'){
+    const step = x.repeat === 'daily' ? 1 : 7;
+    const today = new Date(); today.setHours(0,0,0,0);
+    let d = x.date ? new Date(x.date+'T00:00:00') : new Date(today);
+    do { d.setDate(d.getDate() + step); } while (d <= today);
+    x.date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    save();
+  }
 }
 function isDueSoon(time){
   const [h,m] = time.split(':').map(Number);
@@ -436,7 +542,8 @@ function importBackup(file){
       if(!Array.isArray(data)) throw new Error('bad');
       if(!confirm(t('confirm_restore'))) return;
       tasks = data.map(x => ({ id:x.id||uid(), text:x.text||'', details:x.details||'',
-        quadrant:x.quadrant||'None', time:x.time||'', color:x.color||'', done:!!x.done }));
+        quadrant:x.quadrant||'None', time:x.time||'', date:x.date||'', color:x.color||'',
+        repeat:x.repeat||'', slot:x.slot||0, doneAt:x.doneAt||'', done:!!x.done }));
       save(); render(); closeSheet('backupWrap');
       toast(t('toast_restored'));
     } catch(e){ toast(t('toast_badfile')); }
@@ -447,6 +554,86 @@ function clearAll(){
   if(!confirm(t('confirm_clear'))) return;
   tasks = []; save(); render(); closeSheet('backupWrap');
   toast(t('toast_cleared'));
+}
+
+/* ---------- settings (API key stays on this device only) ---------- */
+function openSettings(){
+  const inp = document.getElementById('fApiKey');
+  inp.type = 'password';
+  inp.value = localStorage.getItem(APIKEY_KEY) || '';
+  document.getElementById('fModel').value = localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
+  document.getElementById('toggleKey').textContent = t('show_key');
+  openSheet('settingsWrap');
+}
+function toggleKeyVisibility(){
+  const inp = document.getElementById('fApiKey');
+  const btn = document.getElementById('toggleKey');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = t(show ? 'hide_key' : 'show_key');
+}
+function saveSettings(){
+  localStorage.setItem(APIKEY_KEY, document.getElementById('fApiKey').value.trim());
+  localStorage.setItem(MODEL_KEY, document.getElementById('fModel').value.trim() || DEFAULT_MODEL);
+  closeSheet('settingsWrap');
+  toast(t('toast_settings'));
+}
+
+/* ---------- AI prioritize (Gemini) ---------- */
+let aiBusy = false;
+async function aiPrioritize(){
+  if(aiBusy) return;
+  const key = localStorage.getItem(APIKEY_KEY) || '';
+  if(!key){ toast(t('ai_nokey')); openSettings(); return; }
+  const list = tasks.filter(x => (!x.quadrant || x.quadrant === 'None') && !x.done);
+  if(!list.length){ toast(t('ai_none')); return; }
+
+  aiBusy = true;
+  const btn = document.getElementById('btnAI');
+  btn.style.opacity = '0.4';
+  toast(t('ai_thinking'));
+
+  let prompt = 'You are an Eisenhower Matrix categorizer. Output JSON allocating these tasks into ' +
+    '\'Do\', \'Schedule\', \'Delegate\', or \'Eliminate\'. Format strictly as {"id": "Category"}.\nTasks:\n';
+  list.forEach(x => { prompt += `- ID: ${x.id} Text: ${x.text}\n`; });
+
+  const model = localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
+  try{
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({ contents:[{ parts:[{ text: prompt }] }] })
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    let text = '';
+    try { text = j.candidates[0].content.parts[0].text || ''; } catch(e){ text = ''; }
+    if(text.includes('```json')) text = text.split('```json')[1].split('```')[0];
+    else if(text.includes('```')) text = text.split('```')[1].split('```')[0];
+    const mapped = JSON.parse(text.trim());
+    const translation = {
+      'Do':'Urgent_Important', 'Schedule':'NotUrgent_Important',
+      'Delegate':'Urgent_NotImportant', 'Eliminate':'NotUrgent_NotImportant'
+    };
+    let n = 0;
+    for(const [id, cat] of Object.entries(mapped)){
+      const x = getTask(id);
+      if(x && translation[cat]){ x.quadrant = translation[cat]; n++; }
+    }
+    if(n){
+      save();
+      currentView = 'matrix';
+      document.querySelectorAll('.tab').forEach(t2 =>
+        t2.classList.toggle('active', t2.dataset.view === 'matrix'));
+      render();
+    }
+    toast(t('ai_done').replace('{n}', n));
+  } catch(e){
+    toast(t('ai_err'));
+  } finally {
+    aiBusy = false;
+    btn.style.opacity = '';
+  }
 }
 
 /* ---------- sheets / toast / helpers ---------- */
@@ -473,6 +660,11 @@ document.getElementById('saveTask').addEventListener('click', saveFromEditor);
 document.getElementById('delTask').addEventListener('click', deleteTask);
 document.getElementById('doneTask').addEventListener('click', toggleDoneFromEditor);
 document.getElementById('clearTime').addEventListener('click', () => document.getElementById('fTime').value='');
+document.getElementById('clearDate').addEventListener('click', () => document.getElementById('fDate').value='');
+document.getElementById('btnAI').addEventListener('click', aiPrioritize);
+document.getElementById('btnSettings').addEventListener('click', openSettings);
+document.getElementById('toggleKey').addEventListener('click', toggleKeyVisibility);
+document.getElementById('saveSettings').addEventListener('click', saveSettings);
 document.getElementById('fQuadSelected').addEventListener('click', () =>
   document.getElementById('fQuad').classList.toggle('open'));
 document.getElementById('btnBackup').addEventListener('click', () => openSheet('backupWrap'));
@@ -483,7 +675,7 @@ document.getElementById('importFile').addEventListener('change', e => { if(e.tar
 document.getElementById('doClear').addEventListener('click', clearAll);
 
 document.querySelectorAll('[data-close]').forEach(el =>
-  el.addEventListener('click', () => { closeSheet('editWrap'); closeSheet('backupWrap'); }));
+  el.addEventListener('click', () => { closeSheet('editWrap'); closeSheet('backupWrap'); closeSheet('settingsWrap'); }));
 
 document.querySelectorAll('.tab').forEach(tab =>
   tab.addEventListener('click', () => {
@@ -499,6 +691,17 @@ document.getElementById('btnBell').addEventListener('click', async () => {
   if(p === 'granted'){ toast(t('rem_on')); scheduleAlarms(); }
   else toast(t('rem_block'));
 });
+
+/* Scrolling over a date/time field must scroll the PAGE, not change the value.
+   Browsers only alter a focused field on wheel, so blurring it prevents the change.
+   (Same idea as the desktop fix that stops the calendar flipping months on scroll.) */
+const WHEEL_SAFE_TYPES = ['date','time','number','datetime-local','month','week'];
+document.addEventListener('wheel', e => {
+  const el = e.target;
+  if (el && el.tagName === 'INPUT' && WHEEL_SAFE_TYPES.includes(el.type) && el === document.activeElement){
+    el.blur();
+  }
+}, { passive: true });
 
 setInterval(scheduleAlarms, 60000);
 

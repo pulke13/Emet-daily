@@ -11,8 +11,8 @@
 <style>
   :root{
     --bg:#121212;
-    --card:rgba(45,45,70,0.70);
-    --card-solid:#20203a;
+    --card:#241c2e;
+    --card-solid:#2b2138;
     --border:1px solid rgba(255,255,255,0.10);
     --text:#ffffff;
     --muted:#9aa0b4;
@@ -107,9 +107,28 @@
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;
     font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
-  input[type=text],textarea,select,input[type=time]{width:100%;background:rgba(255,255,255,0.06);
+  input[type=text],input[type=password],textarea,select,input[type=time],input[type=date]{
+    width:100%;background:rgba(255,255,255,0.06);
     border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;padding:12px;
     font-size:15px;font-family:inherit;}
+
+  .hint{color:var(--muted);font-size:11.5px;padding:6px 18px 0;line-height:1.4;}
+
+  /* Visible, themed scrollbar (desktop browsers; phones use overlay bars) */
+  *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.28) transparent;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);border-radius:5px;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.28);border-radius:5px;}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.45);}
+  .stats{color:var(--muted);font-size:12px;font-weight:700;padding:6px 18px 0;text-align:center;}
+
+  /* Segmented control (Repeat: None / Daily / Weekly) */
+  .segmented{display:flex;gap:6px;}
+  .segmented .seg{flex:1;text-align:center;padding:11px 6px;border-radius:10px;
+    border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);
+    color:var(--muted);font-weight:700;font-size:14px;transition:all .12s;}
+  .segmented .seg.sel{background:var(--schedule);color:#fff;border-color:transparent;}
+  .segmented .seg:active{transform:scale(.97);}
   textarea{min-height:80px;resize:vertical;}
   /* Custom dropdown (replaces native <select>, which can't be styled reliably,
      especially in Hebrew / right-to-left). */
@@ -160,14 +179,18 @@
 <header>
   <h1><span class="bolt">&#9889;</span> <span data-i18n="appTitle">The Emet Daily</span></h1>
   <button class="icon-btn" id="btnLang" title="Language">&#1506;&#1489;</button>
+  <button class="icon-btn" id="btnAI" title="AI Prioritize">&#129504;</button>
   <button class="icon-btn" id="btnBackup" title="Backup / Restore">&#128190;</button>
   <button class="icon-btn" id="btnBell" title="Enable reminders">&#128276;</button>
+  <button class="icon-btn" id="btnSettings" title="Settings">&#9881;</button>
 </header>
 
 <div class="tabs">
   <div class="tab active" data-view="matrix" data-i18n="tabMatrix">Priority Matrix</div>
   <div class="tab" data-view="today" data-i18n="tabToday">Today</div>
 </div>
+<div class="hint" id="hint"></div>
+<div class="stats" id="stats"></div>
 
 <main id="app"></main>
 
@@ -205,6 +228,20 @@
         <button class="btn ghost" id="clearTime" data-i18n="clear_time" style="margin-top:0;">Clear time</button>
       </div>
     </div>
+    <div class="row">
+      <div class="field">
+        <label data-i18n="f_date">Reminder date (optional)</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn ghost" id="clearDate" data-i18n="clear_date" style="margin-top:0;">Clear date</button>
+      </div>
+    </div>
+    <div class="field">
+      <label data-i18n="f_repeat">Repeat</label>
+      <div class="segmented" id="fRepeat"></div>
+    </div>
     <div class="field">
       <label data-i18n="f_color">Card color</label>
       <div class="swatches" id="swatches"></div>
@@ -229,6 +266,29 @@
     <button class="btn ghost" id="doImport" data-i18n="import" style="margin-top:10px;">Restore from file</button>
     <button class="btn danger" id="doClear" data-i18n="clear_all" style="margin-top:10px;">Clear all tasks</button>
     <input type="file" id="importFile" accept=".json,application/json">
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet-wrap" id="settingsWrap">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h2 data-i18n="settings_title">Settings</h2>
+    <p style="color:var(--muted);font-size:13px;margin-top:0;" data-i18n="settings_desc">
+      The API key is stored only on this device and is used by AI Prioritize.
+    </p>
+    <div class="field">
+      <label data-i18n="f_apikey">Gemini API key</label>
+      <div style="display:flex;gap:8px;">
+        <input type="password" id="fApiKey" data-i18n-ph="ph_apikey" placeholder="Paste your Gemini API key..." autocomplete="off" style="flex:1;">
+        <button class="icon-btn" id="toggleKey" style="height:auto;" data-i18n="show_key">Show</button>
+      </div>
+    </div>
+    <div class="field">
+      <label data-i18n="f_model">AI model</label>
+      <input type="text" id="fModel" autocomplete="off">
+    </div>
+    <button class="btn primary" id="saveSettings" data-i18n="save_settings">Save Settings</button>
   </div>
 </div>
 

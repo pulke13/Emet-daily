@@ -1,2 +1,6 @@
 # local backup copies, not part of the app
 *.bak
+*.bak_*
+
+# packaged output / build artifacts
+*.zip
